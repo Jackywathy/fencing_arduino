@@ -3,7 +3,7 @@
 // the library for timings
 
 
-/* pinout:
+/* pinout: TODO FINISH THIS CUZ ITS REALLY BORING!
  *  
  *  
  *  
@@ -15,31 +15,53 @@
  *  
  *  
  */
-#define LEFTPLAYER_IN 6
-#define RIGHTPLAYER_IN 7
-#define LEFTPLAYER_OUT 12
-#define RIGHTPLAYER_OUT 11
+// pins
+#define SWORDINTERRUPT 3
+
+#define LEFTPLAYER_IN 5
+#define RIGHTPLAYER_IN 6
+
+#define LEFTPLAYER_OUT 8
+#define RIGHTPLAYER_OUT 9
+
+#define LEFTPLAYER_LAME 11
+#define RIGHTPLAYER_LAME 12
+
+
+
+//times
 #define DOUBLE_TIME 100
 // ms of a double hit (usually 40-50)
-#define LIGHTON 2400
+#define LIGHTON 2000
 // ms of how long the light will stay on (may be ~60ish ms off but who cares
 #define PAUSETIME 400
 // ms of how long the pause is
-#define TRUE 1
-#define FALSE 0
 #define BEEPLENGTH 3000
 // lenght of beep in ms
+
+
 #define LEFT 'L'
 #define RIGHT 'R'
+
+
+// GLOBAL VARS
 elapsedMillis timer0;
+volatile int weapon_type = 0;
+//0 = foil, 1 = saber, 2 = Epee
+
+// protoypes
+void sabre(void);
+void foil(void);
+void epee(void);
+
 
 int detect_player(int pin){
   // detects if the player given was hit
   if (digitalRead(pin) == LOW){
-    return TRUE;
+    return true;
   }
   else{
-    return FALSE;
+    return false;
   }
 }
 
@@ -56,12 +78,12 @@ int wait_hit(int player){
  
   timer0 = 0;
   while (timer0 <= DOUBLE_TIME){
-    if (detect_player(test) == TRUE){
+    if (detect_player(test) == true){
       Serial.print(test);
-      return TRUE;
+      return true;
     }
   }
-  return FALSE;
+  return false;
   
 }
 
@@ -71,6 +93,22 @@ void turn_off(void){
   digitalWrite(RIGHTPLAYER_OUT, LOW);
   Serial.println("offlights");
   delay(PAUSETIME);
+}
+
+void sword_choose(void){
+  if (weapon_type < 3){
+    weapon_type++;}
+  else if (weapon_type == 3){
+    weapon_type = 0;
+  }
+  
+  if (weapon_type == 0){
+    foil();
+  }
+  else if (weapon_type == 1){
+    sabre();
+  }
+  
 }
 
 
@@ -84,14 +122,17 @@ void setup() {
   Serial.begin(9600);
   Serial.print("Hello world.");
   
+  attachInterrupt(digitalPinToInterrupt(SWORDINTERRUPT),sword_choose,RISING);
+  foil();// TEMP! TODO REMOVE
+  
 }
 
-void loop() {
+
+void foil(void){
   if (detect_player(LEFTPLAYER_IN)){
     Serial.print("UNPLUGEDLET");
     digitalWrite(LEFTPLAYER_OUT, HIGH);
-
-    if (wait_hit(LEFT) == TRUE){
+    if (wait_hit(LEFT) == true){
       digitalWrite(RIGHTPLAYER_OUT, HIGH);}
  
     
@@ -102,23 +143,15 @@ void loop() {
     Serial.print("UNPLUGEDRIT");
     digitalWrite(RIGHTPLAYER_OUT, HIGH);
     
-    if (wait_hit(RIGHT) == TRUE){
+    if (wait_hit(RIGHT) == true){
       digitalWrite(LEFTPLAYER_OUT, HIGH);}
     turn_off();
   }
-
-  }
-
-  /*
-  // will become left player hit soon!
-  buttonState = digitalRead(7);
-  Serial.print(buttonState);
-
-  if (buttonState == LOW) {
-    digitalWrite(LEFTPLAYER_OUT, HIGH);
-  } 
-  else {
-    digitalWrite(LEFTPLAYER_OUT, LOW);
-  }
+  
 }
-*/
+void sabre(void){
+  ;
+}
+
+
+void loop(){;}
