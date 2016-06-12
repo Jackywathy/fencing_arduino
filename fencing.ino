@@ -5,7 +5,7 @@
 
 /* pinout: TODO FINISH THIS CUZ ITS REALLY BORING!
 NOT ALL PINS ARE THE SAME! try find one with less resistance so i chose 2,4,A5 amd A3
-AVOID PINS WITH PWM CONTROL WHEN READING, CUZ THEY have slightly more resistance/
+
 
 
 
@@ -15,32 +15,32 @@ AVOID PINS WITH PWM CONTROL WHEN READING, CUZ THEY have slightly more resistance
 
 
 */
-// pin-ins
+// pins
 #define SWORDINTERRUPT 7
+// i ran out of pins but analog pins can output voltage soooo.... :)
 
 #define LEFTPLAYER_WEAPON 2
 #define RIGHTPLAYER_WEAPON 4
 #define LEFTPLAYER_LAME A2
 #define RIGHTPLAYER_LAME A5
-
-
-// pin-outs
+//
 #define LEFTPLAYER_OUT 9
 #define RIGHTPLAYER_OUT 8
 #define LEFTPLAYER_OFF 10
 #define RIGHTPLAYER_OFF 11
 
 
-
-//times
+//times ( all in ms)
 #define DOUBLE_TIME 100
 // ms of a double hit (usually 40-50)
 #define LIGHTON 2000
 // ms of how long the light will stay on (may be ~60ish ms off but who cares
-#define PAUSETIME 250
+#define PAUSETIME 100
 // ms of how long the pause is
 #define BEEPLENGTH 1500
-// lenght of beep in ms
+// lenght of beep
+#define CHANGETIME 1000
+// time before the box starts working again  after weapon is changed :)
 
 
 #define LEFT 'L'
@@ -49,7 +49,19 @@ AVOID PINS WITH PWM CONTROL WHEN READING, CUZ THEY have slightly more resistance
 
 // GLOBAL VARS
 elapsedMillis timer0;
+elapsedMillis sleeptime = 0;
+int lameRightRead;
+int lameLeftRead;
+
+bool lockoutR = false;
+bool lockoutL = false;
+volatile bool weapon_change = false;
+unsigned long mic = micros();
+
+
+
 volatile int weapon_type = 0;
+
 //0 = foil, 1 = saber, 2 = Epee
 
 // protoypes
@@ -59,41 +71,63 @@ void epee(void);
 
 
 void turn_off(void) {
-  delay(LIGHTON);
+  bool skip_pause = false;
+  int templ;
+  int tempr;
+  sleeptime = 0;
+  while (LIGHTON >= sleeptime){
+    templ = analogRead(LEFTPLAYER_LAME);
+    tempr = analogRead(RIGHTPLAYER_LAME);
+    
+    if (!detect_hit(LEFTPLAYER_WEAPON) && !skip_pause){
+      lockoutR = false;
+    }
+    if (!detect_hit(RIGHTPLAYER_WEAPON) && !skip_pause){
+      lockoutL = false;
+    }
+    if (detect_hit(RIGHTPLAYER_WEAPON) && lockoutL == false){
+      skip_pause = true;
+      lockoutL = true;
+      lameLeftRead = templ;
+      
+    }
+    if (detect_hit(LEFTPLAYER_WEAPON) && lockoutR == false){
+      skip_pause = true;
+      lockoutR = true;
+      lameRightRead = tempr;
+      
+    }
+    
+  }
   digitalWrite(LEFTPLAYER_OUT, LOW);
   digitalWrite(RIGHTPLAYER_OUT, LOW);
   digitalWrite(LEFTPLAYER_OFF, LOW);
   digitalWrite(RIGHTPLAYER_OFF, LOW);
+  
+  sleeptime = 0;
+  if (!skip_pause){
+  while (PAUSETIME >= sleeptime){
+    if (!detect_hit(LEFTPLAYER_WEAPON)){
+      lockoutR = false;
+    }
+    if (!detect_hit(RIGHTPLAYER_WEAPON)){
+      lockoutL = false;
+    }
+  }
+  }
+  else{
+    delay(PAUSETIME);
+  }
+    
+  
 
   Serial.println("offlights");
-  delay(PAUSETIME);
 }
-
-void sword_choose(void) {
-  if (weapon_type < 3) {
-    weapon_type++;
-  }
-  else if (weapon_type == 3) {
-    weapon_type = 0;
-  }
-
-  if (weapon_type == 0) {
-    foil();
-  }
-  else if (weapon_type == 1) {
-    sabre();
-  }
-  else {
-    epee();
-  }
-
-}
-volatile bool weapon_change = false;
-unsigned long mic = micros();
 
 void setup() {
   pinMode(LEFTPLAYER_WEAPON, INPUT_PULLUP);
   pinMode(RIGHTPLAYER_WEAPON, INPUT_PULLUP);
+  pinMode(SWORDINTERRUPT, INPUT_PULLUP);
 
   pinMode(LEFTPLAYER_LAME, INPUT_PULLUP);
   pinMode(RIGHTPLAYER_LAME, INPUT_PULLUP);
@@ -109,11 +143,8 @@ void setup() {
   Serial.begin(9600);
   Serial.print("Hello world.");
 
-  //attachInterrupt(digitalPinToInterrupt(SWORDINTERRUPT), sword_choose, RISING);
 
-  
-
-
+ 
 }
 
 
@@ -124,28 +155,27 @@ bool detect_hit(int pin) {
   return false;
 }
 
-int lameRightRead;
-int lameLeftRead;
-elapsedMillis sleeptime = 0;
+void time_tester(){
+    Serial.println((micros() - mic));
+    mic = micros();
+
+}
 
 
-bool lockoutR = false;
-bool lockoutL = false;
 // if the button is held down
 
 void foil(void) {
   while (1) {
-    //whSerial.println((micros() - mic));
-    //mic = micros();
-    if (weapon_change){
-      weapon_change=false;
+    
+    
+    if (digitalRead(SWORDINTERRUPT)==0){
+      delay(CHANGETIME);
       return;
     }
 
     
     if (!lockoutL){
       lameLeftRead = analogRead(LEFTPLAYER_LAME);
-      Serial.print("READING");
     }
     if (!lockoutR){
       
@@ -154,7 +184,6 @@ void foil(void) {
     if (detect_hit(LEFTPLAYER_WEAPON) && 0) {
       lockoutL = false;
       lockoutR = true;
-      Serial.print("UNPLUGEDLET");
       // if smaller than 900, means that lame is being touched......
       if (lameRightRead < 900) {
         digitalWrite(LEFTPLAYER_OUT, HIGH);
@@ -162,7 +191,6 @@ void foil(void) {
       // else it is off target
       else {
         digitalWrite(LEFTPLAYER_OFF, HIGH);
-        Serial.println(lameRightRead);
       }
 
       // wait for a hit
@@ -188,20 +216,16 @@ void foil(void) {
     }
     
   if (detect_hit(RIGHTPLAYER_WEAPON)) {
-      Serial.print("UNPLUGEDRIGET");
-      Serial.println(lameLeftRead);
       lockoutL = true;
       lockoutR = false;
       
       // if smaller than 900, means that lame is being touched......
       if (lameLeftRead < 900) {
-        Serial.println("HERER");
         digitalWrite(RIGHTPLAYER_OUT, HIGH);
       }
       // else it is off target
       else {
         digitalWrite(RIGHTPLAYER_OFF, HIGH);
-        Serial.println(lameLeftRead);
       }
 
       // wait for a hit
@@ -227,26 +251,53 @@ void foil(void) {
     }
   lockoutL = false;
   lockoutR = false;
+  //return; // TODO REMOVE
   }
+  
   
 }
 void sabre(void) {
-  ;
-}
-void epee(void) {
-  ;
+  foil();
 }
 
+
+bool epeeRead(int pin){
+  // reads in an epee-style
+  
+}
+
+// connect A to 5v, (WAS LAME BEFORE)
+// B to an input before (WAS WEAPON BEFORE)
+
+void epee(void) {
+
+  pinMode(LEFTPLAYER_LAME,OUTPUT);
+  pinMode(RIGHTPLAYER_LAME,OUTPUT);
+  pinMode(RIGHTPLAYER_WEAPON,INPUT);
+  pinMode(LEFTPLAYER_WEAPON,INPUT);
+  
+  while (1) {
+    if (digitalRead(SWORDINTERRUPT)==0){
+      delay(CHANGETIME);
+      return;
+    }
+    Serial.println(analogRead(A4));
+
+}
+}
 
 void loop(void) {
-  Serial.println("ENTERINGLOOP");
-  if (weapon_type==0){
-    foil();
-  }
-  else if (weapon_type == 1){
-    sabre();
-  }
-  else{
-    epee();
-  }
+  Serial.println("foil");
+  foil();
+  Serial.println("saber");
+  sabre();
+  Serial.println("epee");
+  epee();
+  pinMode(LEFTPLAYER_LAME,INPUT_PULLUP);
+  pinMode(RIGHTPLAYER_LAME,INPUT_PULLUP);
+    pinMode(LEFTPLAYER_WEAPON,INPUT_PULLUP);
+   pinMode(RIGHTPLAYER_WEAPON,INPUT_PULLUP);
+  
+  
+  
 }
