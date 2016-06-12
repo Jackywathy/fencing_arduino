@@ -5,7 +5,7 @@
 
 /* pinout: TODO FINISH THIS CUZ ITS REALLY BORING!
 NOT ALL PINS ARE THE SAME! try find one with less resistance so i chose 2,4,A5 amd A3
-
+AVOID PINS WITH PWM CONTROL WHEN READING, CUZ THEY have slightly more resistance/
 
 
 
@@ -15,14 +15,16 @@ NOT ALL PINS ARE THE SAME! try find one with less resistance so i chose 2,4,A5 a
 
 
 */
-// pins
+// pin-ins
 #define SWORDINTERRUPT 7
 
 #define LEFTPLAYER_WEAPON 2
 #define RIGHTPLAYER_WEAPON 4
 #define LEFTPLAYER_LAME A2
 #define RIGHTPLAYER_LAME A5
-//
+
+
+// pin-outs
 #define LEFTPLAYER_OUT 9
 #define RIGHTPLAYER_OUT 8
 #define LEFTPLAYER_OFF 10
