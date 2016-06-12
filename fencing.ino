@@ -5,7 +5,7 @@
 
 /* pinout: TODO FINISH THIS CUZ ITS REALLY BORING!
 NOT ALL PINS ARE THE SAME! try find one with less resistance so i chose 2,4,A5 amd A3
-
+PWM ONES(THE ONES WITH A ~) are particularily bad in this regard
 
 
 
