@@ -29,15 +29,17 @@ PWM ONES(THE ONES WITH A ~) are particularily bad in this regard
 #define LEFTPLAYER_OFF 10
 #define RIGHTPLAYER_OFF 11
 
+#define BEEP_OUT 12
+
 
 //times ( all in ms)
 #define DOUBLE_TIME 100
 // ms of a double hit (usually 40-50)
-#define LIGHTON 2000
+#define LIGHTON 1700
 // ms of how long the light will stay on (may be ~60ish ms off but who cares
 #define PAUSETIME 100
 // ms of how long the pause is
-#define BEEPLENGTH 1500
+#define BEEPLENGTH 800
 // lenght of beep
 #define CHANGETIME 1000
 // time before the box starts working again  after weapon is changed :)
@@ -53,14 +55,11 @@ elapsedMillis sleeptime = 0;
 int lameRightRead;
 int lameLeftRead;
 
-bool lockoutR = false;
-bool lockoutL = false;
 volatile bool weapon_change = false;
 unsigned long mic = micros();
 
 
 
-volatile int weapon_type = 0;
 
 //0 = foil, 1 = saber, 2 = Epee
 
@@ -68,60 +67,33 @@ volatile int weapon_type = 0;
 void sabre(void);
 void foil(void);
 void epee(void);
+void update_both_lane(void);
+
 
 
 void turn_off(void) {
-  bool skip_pause = false;
-  int templ;
-  int tempr;
   sleeptime = 0;
+  // keep lights on for sleeptime amount
   while (LIGHTON >= sleeptime){
-    templ = analogRead(LEFTPLAYER_LAME);
-    tempr = analogRead(RIGHTPLAYER_LAME);
-    
-    if (!detect_hit(LEFTPLAYER_WEAPON) && !skip_pause){
-      lockoutR = false;
+    update_both_lame();
+    if (sleeptime > BEEPLENGTH){
+      digitalWrite(BEEP_OUT, LOW);
     }
-    if (!detect_hit(RIGHTPLAYER_WEAPON) && !skip_pause){
-      lockoutL = false;
     }
-    if (detect_hit(RIGHTPLAYER_WEAPON) && lockoutL == false){
-      skip_pause = true;
-      lockoutL = true;
-      lameLeftRead = templ;
-      
-    }
-    if (detect_hit(LEFTPLAYER_WEAPON) && lockoutR == false){
-      skip_pause = true;
-      lockoutR = true;
-      lameRightRead = tempr;
-      
-    }
-    
-  }
+  // turn off all the lights
   digitalWrite(LEFTPLAYER_OUT, LOW);
   digitalWrite(RIGHTPLAYER_OUT, LOW);
   digitalWrite(LEFTPLAYER_OFF, LOW);
   digitalWrite(RIGHTPLAYER_OFF, LOW);
-  
+  // pause for 
   sleeptime = 0;
-  if (!skip_pause){
   while (PAUSETIME >= sleeptime){
-    if (!detect_hit(LEFTPLAYER_WEAPON)){
-      lockoutR = false;
-    }
-    if (!detect_hit(RIGHTPLAYER_WEAPON)){
-      lockoutL = false;
-    }
-  }
-  }
-  else{
-    delay(PAUSETIME);
-  }
-    
+    update_both_lame();
+}
+
   
 
-  Serial.println("offlights");
+
 }
 
 void setup() {
@@ -162,28 +134,38 @@ void time_tester(){
 }
 
 
-// if the button is held down
+void update_lame_l(void){
+  if (!detect_hit(RIGHTPLAYER_WEAPON)){
+      lameLeftRead = analogRead(LEFTPLAYER_LAME);
+      //Serial.println("UPDATINGLEFT");
+      
+      }
+}
+void update_lame_r(void){
+    if (!detect_hit(LEFTPLAYER_WEAPON)){
+      lameRightRead = analogRead(RIGHTPLAYER_LAME);
+  }
+}
+
+void update_both_lame(void){
+  update_lame_l();
+  update_lame_r();
+}
+
+
 
 void foil(void) {
   while (1) {
+    //time_tester();
     
     
     if (digitalRead(SWORDINTERRUPT)==0){
       delay(CHANGETIME);
       return;
     }
+    update_both_lame(); 
 
-    
-    if (!lockoutL){
-      lameLeftRead = analogRead(LEFTPLAYER_LAME);
-    }
-    if (!lockoutR){
-      
-      lameRightRead = analogRead(RIGHTPLAYER_LAME);
-    }
-    if (detect_hit(LEFTPLAYER_WEAPON) && 0) {
-      lockoutL = false;
-      lockoutR = true;
+    if (detect_hit(LEFTPLAYER_WEAPON)) {
       // if smaller than 900, means that lame is being touched......
       if (lameRightRead < 900) {
         digitalWrite(LEFTPLAYER_OUT, HIGH);
@@ -196,10 +178,10 @@ void foil(void) {
       // wait for a hit
       timer0 = 0;
       while (timer0 <= DOUBLE_TIME) {
+        update_lame_l();
         if (detect_hit(RIGHTPLAYER_WEAPON)) {
-          lockoutL = true;
           // if the hit is on
-          if (analogRead(LEFTPLAYER_LAME) < 900)
+          if (lameLeftRead < 900)
           {
             digitalWrite(RIGHTPLAYER_OUT, HIGH);
             break;
@@ -216,8 +198,6 @@ void foil(void) {
     }
     
   if (detect_hit(RIGHTPLAYER_WEAPON)) {
-      lockoutL = true;
-      lockoutR = false;
       
       // if smaller than 900, means that lame is being touched......
       if (lameLeftRead < 900) {
@@ -233,7 +213,6 @@ void foil(void) {
       while (timer0 <= DOUBLE_TIME) {
         if (detect_hit(LEFTPLAYER_WEAPON)) {
           // if the hit is on
-          lockoutR = true;
           if (analogRead(RIGHTPLAYER_LAME) < 900)
           {
             digitalWrite(LEFTPLAYER_OUT, HIGH);
@@ -249,8 +228,7 @@ void foil(void) {
       turn_off();
       continue;
     }
-  lockoutL = false;
-  lockoutR = false;
+
   //return; // TODO REMOVE
   }
   
