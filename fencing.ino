@@ -31,7 +31,7 @@ PWM ONES(THE ONES WITH A ~) are particularily bad in this regard
 
 #define BEEP_OUT 12
 
-
+#define VOLT_ON 900
 //times ( all in ms)
 #define DOUBLE_TIME 100
 // ms of a double hit (usually 40-50)
@@ -50,8 +50,7 @@ PWM ONES(THE ONES WITH A ~) are particularily bad in this regard
 
 
 // GLOBAL VARS
-elapsedMillis timer0;
-elapsedMillis sleeptime = 0;
+
 int lameRightRead;
 int lameLeftRead;
 
@@ -72,6 +71,7 @@ void update_both_lane(void);
 
 
 void turn_off(void) {
+  elapsedMillis sleeptime = 0;
   sleeptime = 0;
   // keep lights on for sleeptime amount
   while (LIGHTON >= sleeptime){
@@ -153,8 +153,10 @@ void update_both_lame(void){
 }
 
 
-
 void foil(void) {
+  
+  elapsedMillis timer0;
+  
   while (1) {
     //time_tester();
     
@@ -165,23 +167,20 @@ void foil(void) {
     }
     update_both_lame(); 
 
-    if (detect_hit(LEFTPLAYER_WEAPON)) {
-      // if smaller than 900, means that lame is being touched......
-      if (lameRightRead < 900) {
+    if (detect_hit(LEFTPLAYER_WEAPON)) {// Leftplayer hit something
+      if (lameRightRead < VOLT_ON) {
         digitalWrite(LEFTPLAYER_OUT, HIGH);
       }
-      // else it is off target
       else {
         digitalWrite(LEFTPLAYER_OFF, HIGH);
       }
 
-      // wait for a hit
+      // wait for a hit from rightplayer_
       timer0 = 0;
       while (timer0 <= DOUBLE_TIME) {
         update_lame_l();
         if (detect_hit(RIGHTPLAYER_WEAPON)) {
-          // if the hit is on
-          if (lameLeftRead < 900)
+          if (lameLeftRead < VOLT_ON)
           {
             digitalWrite(RIGHTPLAYER_OUT, HIGH);
             break;
@@ -197,20 +196,14 @@ void foil(void) {
       continue;
     }
     
-  if (detect_hit(RIGHTPLAYER_WEAPON)) {
+  if (detect_hit(RIGHTPLAYER_WEAPON)) { //RIghtplayer hit somting
+      if (lameLeftRead < VOLT_ON) {digitalWrite(RIGHTPLAYER_OUT, HIGH);}
+      else {digitalWrite(RIGHTPLAYER_OFF, HIGH);}
       
-      // if smaller than 900, means that lame is being touched......
-      if (lameLeftRead < 900) {
-        digitalWrite(RIGHTPLAYER_OUT, HIGH);
-      }
-      // else it is off target
-      else {
-        digitalWrite(RIGHTPLAYER_OFF, HIGH);
-      }
-
-      // wait for a hit
+      // wait for a hit from left_player
       timer0 = 0;
       while (timer0 <= DOUBLE_TIME) {
+        update_lame_r();
         if (detect_hit(LEFTPLAYER_WEAPON)) {
           // if the hit is on
           if (analogRead(RIGHTPLAYER_LAME) < 900)
@@ -229,12 +222,12 @@ void foil(void) {
       continue;
     }
 
-  //return; // TODO REMOVE
   }
   
   
 }
 void sabre(void) {
+  //
   foil();
 }
 
