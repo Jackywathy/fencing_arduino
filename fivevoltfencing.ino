@@ -50,7 +50,8 @@
 #define CHANGETIME 1000 // length of time after change weapon before starts to work
 
 // button- pressed times:
-#define FOIL_PRESSED 14 // ms required to be a valid hit
+#define FOIL_DWELL 15 // ms required to be a valid hit
+#define FOIL_LOCK 300 // ms of time for the second person to hit
 
 #define LEFT 'L'
 #define RIGHT 'R'
@@ -74,50 +75,10 @@ void update_both_lane(void);
 
 
 
-void turn_off(void) {
-  elapsedMillis sleeptime = 0;
-  // keep lights on for sleeptime amount
-  while (LIGHTON >= sleeptime) {
-    update_both_lame();
-    if (sleeptime > BEEPLENGTH) {
-      digitalWrite(BEEP_OUT, LOW);
-    }
-    if (digitalRead(SWORDINTERRUPT) == 0) {
-      weapon_change = true;
-      digitalWrite(LEFTPLAYER_OUT, LOW);
-      digitalWrite(RIGHTPLAYER_OUT, LOW);
-      digitalWrite(LEFTPLAYER_OFF, LOW);
-      digitalWrite(RIGHTPLAYER_OFF, LOW);
-      return;
-    }
-  }
-  // turn off all the lights
-  digitalWrite(LEFTPLAYER_OUT, LOW);
-  digitalWrite(RIGHTPLAYER_OUT, LOW);
-  digitalWrite(LEFTPLAYER_OFF, LOW);
-  digitalWrite(RIGHTPLAYER_OFF, LOW);
-  // pause for
-  sleeptime = 0;
-  while (PAUSETIME >= sleeptime) {
-    update_both_lame();
-    if (digitalRead(SWORDINTERRUPT) == 0) {
-      weapon_change = true;
-      return;
-    }
-  }
-
-
-
-
-}
 
 void setup() {
   pinMode(SWORDINTERRUPT, INPUT_PULLUP);
-  pinMode(RIGHTPLAYER_OUT, OUTPUT);
-  pinMode(LEFTPLAYER_OUT, OUTPUT);
 
-  pinMode(RIGHTPLAYER_OFF, OUTPUT);
-  pinMode(LEFTPLAYER_OFF, OUTPUT);
   foil_pin();
 
 
@@ -144,72 +105,146 @@ void time_tester() {
 }
 
 
-
 void foil_pin(void) {
-  pinMode(LEFTPLAYER_WEAPON, INPUT);
-  pinMode(RIGHTPLAYER_WEAPON, INPUT);
+  pinMode(LEFT_WEAPON, INPUT);
+  pinMode(RIGHT_WEAPON, INPUT);
 
-  pinMode(LEFTPLAYER_LAME, INPUT);
-  pinMode(RIGHTPLAYER_LAME, INPUT);
+  pinMode(LEFT_LAME, INPUT);
+  pinMode(RIGHT_LAME, INPUT);
 }
 
 int left_hit_time;
 
 void foil(void) {
-
+  // USING ALL LOCAL VARS FOR SLIGHT SPEED BOOST
   int lameR, lameL;
-  elapsedMillis timer;
-  while (1) {
-    timer = 0;
-    lameR = analogRead(RIGHT_LAME);
-    lameL = analogRead(LEFT_LAME);
+  bool hit_r = false, hit_l = false;   // if a hit is registered
+  int left_hit_ts, right_hit_ts;       // Millisc that the sword hit (ts = timestap)
+  int left_stop_ts, right_stop_ts;    // Millisec that the sword was released
+  bool reset = true;
+  bool lockl=false, lockr=false;
+  elapsedMillis timer, temp;
+  while (1) { // void loop() has extra overhead due to arduino main() also calling additional funcs.
+   
+    if (reset){timer = 0;} // reset the timer to prevent int. overflow
+    else {reset = true;}    // a button was not pressed long enough so we have to skip the reset once.
+    
+
     //time_tester();
     if (digitalRead(SWORDINTERRUPT) == 0) {
       delay(CHANGETIME);
       return;
     }
-    if (detect_hit(LEFTPLAYER_WEAPON)) {// Leftplayer hit something
-      left_hit =
+    if (detect_hit(RIGHT_WEAPON)) {// rplayer hit something
+      //left_hit_ts = timer;
+      //hit_l = true;
 
+      if (analogRead(LEFT_LAME) > 800){digitalWrite(R_OUT, HIGH);}
+      else{digitalWrite(R_OFF, HIGH);}
+      
+      temp = 0;
+      while (temp <= FOIL_LOCK){
+        if (detect_hit(LEFT_WEAPON)){
+          if (analogRead(RIGHT_LAME) > 800){
+            digitalWrite(L_OUT, HIGH);
+            break;
+          }
+          else{
+            digitalWrite(L_OFF, HIGH);
+            break;
+          }
+      }
+      
     }
-    turn_off();
-    continue;
-  }
+    }
 
-  if (detect_hit(RIGHTPLAYER_WEAPON)) { //RIghtplayer hit somting
-    if (lameLeftRead < VOLT_ON) {
-      digitalWrite(RIGHTPLAYER_OUT, HIGH);
-    }
-    else {
-      digitalWrite(RIGHTPLAYER_OFF, HIGH);
-    }
+    else if (detect_hit(LEFT_WEAPON)) {// RIGHPLAYER hit something
+      //right_hit_ts = timer;
+      //hit_r = true;
 
-    // wait for a hit from left_player
-    timer0 = 0;
-    while (timer0 <= DOUBLE_TIME) {
-      update_lame_r();
-      if (detect_hit(LEFTPLAYER_WEAPON)) {
-        // if the hit is on
-        if (lameRightRead < 900)
-        {
-          digitalWrite(LEFTPLAYER_OUT, HIGH);
+
+      if (analogRead(RIGHT_LAME) > 800){digitalWrite(L_OUT, HIGH);}
+      else{digitalWrite(L_OFF, HIGH);}
+      
+      temp = 0;
+      while (temp <= FOIL_LOCK){
+        if (detect_hit(RIGHT_WEAPON)){
+          if (analogRead(LEFT_LAME) > 800){
+            digitalWrite(R_OUT, HIGH);
+            break;
+          }
+          else{
+            digitalWrite(R_OFF, HIGH);
+            break;
+          }
+      }
+      
+    }
+    }
+    
+
+
+      /*
+      right_stop_ts = left_hit + FOIL_DWELL; // make it so if button is not released, it will be equal to FOIL_PRESSED
+      while (1){ // wait for FOIL_DWELL time to ensure that the hit lasts for that long 
+        if(!hit_l && detect_hit(LEFT_WEAPON))){  //  if the other manages to hit, dont overright if already created
+            left_hit_ts = timer;
+            left_stop_ts = timer + FOIL_DWELL;
+            hit_l = true;
+        }
+
+        if (!detect_hit(R_WEAPON)&&(temp < FOIL_DWELL)&&(!lockr)){// not pressed, time is smaller than ts+Foil_Dwell, no lockout
+          right_stop_ts = timer;
+          lockr = true;
+        }
+
+        if (hit_l && !detect_hit(L_WEAPON) && (temp < left_hit_ts + FOIL_DWELL)&&(!lockl)){
+          left_stop_ts = timer;
+          lockl = true;
+        }
+        // check that the loop still needs to run
+        if (hit_l){
+          if (timer >= left_hit_ts + FOIL_DWELL){break;}
+        }
+        else {
+          if (timer >= right_hit_ts + FOIL_DWELL){break;}
+        }
+      }
+      while (temp <= FOIL_LOCK){ // 300ms to get another hit
+        if (!lockl){
           break;
         }
-        else
-        {
-          digitalWrite(LEFTPLAYER_OFF, HIGH);
+        if (!hit_l && detect_hit(LEFT_WEAPON)){ // iniatize hit_l
+          left_hit_ts = timer;
+          left_stop_ts = timer + FOIL_DWELL;
+        }
+        if (hit_l && !detect_hit(L_WEAPON) && (temp < left_hit_ts + FOIL_DWELL) && (!lockl)){
+          left_stop_ts = timer;
+          break;
+        }
+        if (hit_l && (temp > left_hit_ts + FOIL_DWELL)){
           break;
         }
       }
-    }
-    turn_off();
-    continue;
-  }
+
+      if (right_hit_ts - right_stop_ts < FOIL_DWELL){
+          hit_r = false;
+      }
+      if (left_hit_ts - left_stop_ts < FOIL_DWELL){
+        hit_l = false;
+      }
+    
+    */
+     
+      
+
+    
 
 }
 
 
 }
+
 void sabre(void) {
   //
   foil();
@@ -225,12 +260,8 @@ bool epeeRead(int pin) {
 // B to an epee input before (WAS WEAPON BEFORE)
 void epee_pins(void) {
   // voltage pins: Throguh line A
-  pinMode(LEFTPLAYER_LAME, OUTPUT);
-  pinMode(RIGHTPLAYER_LAME, OUTPUT);
 
-  // disable these pins cuz they might be interferring
-  pinMode(RIGHTPLAYER_WEAPON, INPUT);
-  pinMode(LEFTPLAYER_WEAPON, INPUT);
+
 
   // GROUND PINS- ALSO ABLE TO READ
 
@@ -256,10 +287,7 @@ void loop(void) {
   sabre();
   Serial.println("epee");
   epee();
-  pinMode(LEFTPLAYER_LAME, INPUT_PULLUP);
-  pinMode(RIGHTPLAYER_LAME, INPUT_PULLUP);
-  pinMode(LEFTPLAYER_WEAPON, INPUT_PULLUP);
-  pinMode(RIGHTPLAYER_WEAPON, INPUT_PULLUP);
+
 
 
 
